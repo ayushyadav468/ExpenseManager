@@ -1,18 +1,22 @@
 package com.example.ayushyadav.expensemanager;
 
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.TextView;
 
+import java.util.ArrayList;
+
 public class DetailActivity extends AppCompatActivity {
 
     TextView titleTextView;
     TextView descTextView;
     TextView amountTextView;
-    Bundle bundle;
+    ExpenseOpenHelper openHelper;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -24,12 +28,19 @@ public class DetailActivity extends AppCompatActivity {
         amountTextView = findViewById(R.id.amount);
 
         Intent intent = getIntent();
-        bundle = intent.getExtras();
-        if(bundle != null){
-            populateDataFromBundle();
-        }
-        else {
-            bundle = new Bundle();
+        long id = intent.getLongExtra("Click_ID", -1);
+
+        if(id != -1){
+            ArrayList<Expense> expenseArrayList = fetchExpensesFromDB();
+            Expense expense = expenseArrayList.get(0);
+            titleTextView.setText(expense.getTitle());
+            descTextView.setText(expense.getDescription());
+            amountTextView.setText(expense.getAmount());
+        }else {
+            //Do nothing
+            titleTextView.setText("Nothing To Show");
+            descTextView.setText("Nothing To Show");
+            amountTextView.setText("0.00");
         }
 
     }
@@ -44,7 +55,6 @@ public class DetailActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         if(item.getItemId() == R.id.edit){
             Intent intent = new Intent(this,EditActivity.class);
-            intent.putExtras(bundle);
             startActivityForResult(intent,Constants.EDIT_EXPENSE_REQUEST);
         }
         return super.onOptionsItemSelected(item);
@@ -55,24 +65,28 @@ public class DetailActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if(requestCode == Constants.EDIT_EXPENSE_REQUEST){
             if(resultCode == Constants.SAVE_SUCCESS_RESULT){
-
-                bundle = data.getExtras();
-                if(bundle != null){
-                    populateDataFromBundle();
-                    setResult(resultCode,data);
-                }
+                fetchExpensesFromDB();
+            } else if (resultCode == Constants.Cancel_Clicked){
+               //Do Nothing
             }
         }
 
-
     }
-    private void populateDataFromBundle(){
-        String title = bundle.getString(Constants.TITLE_KEY,"");
-        String desc = bundle.getString(Constants.DESCRIPTION_KEY,"");
-        int amount = bundle.getInt(Constants.AMOUNT_KEY,0);
 
-        titleTextView.setText(title);
-        descTextView.setText(desc);
-        amountTextView.setText(amount + " ₹");
+    private ArrayList<Expense> fetchExpensesFromDB() {
+        ArrayList<Expense> expenses = new ArrayList<>();
+
+        SQLiteDatabase database = openHelper.getReadableDatabase();
+        Cursor cursor = database.query(Contract.Expenses.TABLE_NAME,null,null,null,null,null,null);
+        while (cursor.moveToNext()){
+            int titleColumnIndex = cursor.getColumnIndex(Contract.Expenses.TITLE);
+            String title = cursor.getString(titleColumnIndex);
+            String desc = cursor.getString(cursor.getColumnIndex(Contract.Expenses.DESCRIPTION));
+            int amount = cursor.getInt(cursor.getColumnIndex(Contract.Expenses.AMOUNT));
+            int id = cursor.getInt(cursor.getColumnIndex(Contract.Expenses.ID));
+            Expense expense = new Expense(title,desc,amount,id);
+            expenses.add(expense);
+        }
+        return  expenses;
     }
 }
